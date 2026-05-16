@@ -145,15 +145,23 @@ pub fn launch_codex_plus(request: LaunchRequest) -> CommandResult<Value> {
                     let _ = tauri::async_runtime::block_on(handle.wait_for_codex_exit());
                 }
                 Err(error) => {
-                    let status = LaunchStatus {
-                        status: "failed".to_string(),
-                        message: format!("启动失败：{error}"),
-                        started_at_ms: now_ms(),
-                        debug_port: Some(debug_port),
-                        helper_port: Some(helper_port),
-                        codex_app: None,
-                    };
-                    let _ = StatusStore::default().save_latest(&status);
+                    let status_store = StatusStore::default();
+                    let latest = status_store.load_latest().ok().flatten();
+                    if should_write_manager_launch_failure(
+                        latest.as_ref(),
+                        debug_port,
+                        helper_port,
+                    ) {
+                        let status = LaunchStatus {
+                            status: "failed".to_string(),
+                            message: format!("启动失败：{error}"),
+                            started_at_ms: now_ms(),
+                            debug_port: Some(debug_port),
+                            helper_port: Some(helper_port),
+                            codex_app: None,
+                        };
+                        let _ = status_store.save_latest(&status);
+                    }
                 }
             }
         }) {
@@ -455,6 +463,20 @@ fn now_ms() -> u64 {
         .as_millis() as u64
 }
 
+fn should_write_manager_launch_failure(
+    latest: Option<&LaunchStatus>,
+    debug_port: u16,
+    helper_port: u16,
+) -> bool {
+    !matches!(
+        latest,
+        Some(status)
+            if status.status == "failed"
+                && status.debug_port == Some(debug_port)
+                && status.helper_port == Some(helper_port)
+    )
+}
+
 fn read_tail(path: &Path, max_lines: usize) -> std::io::Result<String> {
     let contents = fs::read_to_string(path)?;
     let mut lines = contents.lines().rev().take(max_lines).collect::<Vec<_>>();
@@ -573,5 +595,29 @@ mod tests {
         if result.payload.text.is_empty() {
             assert_eq!(result.status, "failed");
         }
+    }
+
+    #[test]
+    fn manager_launch_failure_does_not_replace_core_failure_for_same_ports() {
+        let latest = LaunchStatus {
+            status: "failed".to_string(),
+            message: "core failure".to_string(),
+            started_at_ms: 10,
+            debug_port: Some(9229),
+            helper_port: Some(57321),
+            codex_app: Some("C:/Program Files/Codex".to_string()),
+        };
+
+        assert!(!should_write_manager_launch_failure(
+            Some(&latest),
+            9229,
+            57321
+        ));
+        assert!(should_write_manager_launch_failure(
+            Some(&latest),
+            9230,
+            57321
+        ));
+        assert!(should_write_manager_launch_failure(None, 9229, 57321));
     }
 }
