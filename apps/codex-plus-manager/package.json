@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit --target ES2022 --module ESNext --moduleResolution Bundler --lib ES2022,DOM --strict src/main.tsx src/App.ts",
     "vite:dev": "vite --host 127.0.0.1 --port 1420",
     "vite:build": "vite build"
   },
