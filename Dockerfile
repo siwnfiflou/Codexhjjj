@@ -22,6 +22,21 @@ RUN git clone https://github.com/SillyTavern/SillyTavern.git .
 RUN echo "*** 安装npm包 ***" && \
     npm install && npm cache clean --force
 
+RUN bash -c '\
+  urls=("https://raw.githubusercontent.com/Lianues/cocktail-plus/main/server-plugins/cocktail-plus/scripts/cocktail-plus-helper.sh" \
+        "https://raw.giteeusercontent.com/lianues/cocktail-plus/raw/main/server-plugins/cocktail-plus/scripts/cocktail-plus-helper.sh"); \
+  f="${TMPDIR:-/tmp}/cocktail-plus-helper.sh"; \
+  ok=0; \
+  for u in "${urls[@]}"; do \
+    curl -fsSL "$u" -o "$f" && ok=1 && break; \
+  done; \
+  if [ "$ok" = 1 ]; then \
+    bash "$f"; \
+  else \
+    echo "下载失败：请检查网络"; \
+    exit 1; \
+  fi'
+
 COPY launch.sh syd.sh ./
 RUN chmod +x launch.sh syd.sh && \
     dos2unix launch.sh syd.sh
