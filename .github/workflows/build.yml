@@ -1,0 +1,48 @@
+name: Build and Push to ghcr.io
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: '镜像名称（不含 registry 前缀）'
+        required: false
+        default: 'my-sillytavern'
+        type: string
+      image_tag:
+        description: '镜像标签'
+        required: false
+        default: 'latest'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置镜像元数据
+        id: meta
+        run: |
+          IMAGE_NAME=${{ github.event.inputs.image_name || 'my-sillytavern' }}
+          IMAGE_TAG=${{ github.event.inputs.image_tag || 'latest' }}
+          echo "image_name=${IMAGE_NAME}" >> $GITHUB_OUTPUT
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: 登录 ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.meta.outputs.image_name }}:${{ steps.meta.outputs.image_tag }}
