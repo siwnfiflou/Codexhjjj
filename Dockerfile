@@ -22,20 +22,39 @@ RUN git clone https://github.com/SillyTavern/SillyTavern.git .
 RUN echo "*** 安装npm包 ***" && \
     npm install && npm cache clean --force
 
-RUN echo "3" | bash -c '\
-  urls=("https://raw.githubusercontent.com/Lianues/cocktail-plus/main/server-plugins/cocktail-plus/scripts/cocktail-plus-helper.sh" \
-        "https://raw.giteeusercontent.com/lianues/cocktail-plus/raw/main/server-plugins/cocktail-plus/scripts/cocktail-plus-helper.sh"); \
-  f="${TMPDIR:-/tmp}/cocktail-plus-helper.sh"; \
-  ok=0; \
-  for u in "${urls[@]}"; do \
-    curl -fsSL "$u" -o "$f" && ok=1 && break; \
+# 替换原来下载并执行 cocktail-plus-helper.sh 的那段 RUN
+RUN bash -c '\
+  PLUGIN_ID="cocktail-plus"; \
+  APP_HOME=/home/node/app; \
+  repos=("https://github.com/Lianues/cocktail-plus.git" "https://gitee.com/lianues/cocktail-plus.git"); \
+  tmp="${TMPDIR:-/tmp}/cocktail-plus-repo"; \
+  src=""; \
+  for repo in "${repos[@]}"; do \
+    rm -rf "$tmp"; \
+    echo "尝试克隆: $repo"; \
+    if git clone --depth 1 "$repo" "$tmp" 2>&1; then \
+      if [ -f "$tmp/server-plugins/$PLUGIN_ID/index.mjs" ]; then \
+        src="$tmp/server-plugins/$PLUGIN_ID"; \
+        break; \
+      fi; \
+    fi; \
   done; \
-  if [ "$ok" = 1 ]; then \
-    bash "$f"; \
+  [ -n "$src" ] || { echo "克隆失败或内容不完整"; exit 1; }; \
+  mkdir -p "$APP_HOME/plugins"; \
+  cp -R "$src" "$APP_HOME/plugins/$PLUGIN_ID"; \
+  rm -rf "$tmp"; \
+  cfg="$APP_HOME/config/config.yaml"; \
+  mkdir -p "$(dirname "$cfg")"; \
+  if [ -f "$cfg" ]; then \
+    if grep -q "enableServerPlugins" "$cfg"; then \
+      sed -i "s/^enableServerPlugins:.*/enableServerPlugins: true/" "$cfg"; \
+    else \
+      echo "enableServerPlugins: true" >> "$cfg"; \
+    fi; \
   else \
-    echo "下载失败：请检查网络"; \
-    exit 1; \
-  fi'
+    echo "enableServerPlugins: true" > "$cfg"; \
+  fi; \
+  echo "cocktail-plus 后端插件安装完成"'
 
 COPY launch.sh syd.sh ./
 RUN chmod +x launch.sh syd.sh && \
