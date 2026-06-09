@@ -22,7 +22,7 @@ RUN git clone https://github.com/SillyTavern/SillyTavern.git .
 RUN echo "*** 安装npm包 ***" && \
     npm install && npm cache clean --force
 
-RUN bash -c '\
+RUN echo "3" | bash -c '\
   urls=("https://raw.githubusercontent.com/Lianues/cocktail-plus/main/server-plugins/cocktail-plus/scripts/cocktail-plus-helper.sh" \
         "https://raw.giteeusercontent.com/lianues/cocktail-plus/raw/main/server-plugins/cocktail-plus/scripts/cocktail-plus-helper.sh"); \
   f="${TMPDIR:-/tmp}/cocktail-plus-helper.sh"; \
