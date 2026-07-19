@@ -2,11 +2,23 @@ FROM node:19.1.0-alpine3.16
 
 ARG APP_HOME=/home/node/app
 
-
-
 RUN apk add --no-cache gcompat tini git python3 py3-pip bash dos2unix findutils tar curl
 
 RUN pip3 install --no-cache-dir huggingface_hub
+
+# ===== 安装 cloudflared =====
+RUN set -eux; \
+    ARCH="$(uname -m)"; \
+    case "$ARCH" in \
+      x86_64)  CF_ARCH="amd64" ;; \
+      aarch64) CF_ARCH="arm64" ;; \
+      armv7l)  CF_ARCH="arm" ;; \
+      *) echo "不支持的架构: $ARCH" && exit 1 ;; \
+    esac; \
+    curl -L -o /usr/local/bin/cloudflared \
+      "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}"; \
+    chmod +x /usr/local/bin/cloudflared
+# =============================
 
 ENTRYPOINT [ "tini", "--" ]
 
@@ -17,12 +29,15 @@ ENV NODE_ENV=production
 ENV USERNAME="admin"
 ENV PASSWORD="password"
 
+# ===== 新增：Tunnel Token（见下方两种填法说明）=====
+ENV TUNNEL_TOKEN=""
+# ====================================================
+
 RUN git clone https://github.com/SillyTavern/SillyTavern.git .
 
 RUN echo "*** 安装npm包 ***" && \
     npm install && npm cache clean --force
 
-# 替换原来下载并执行 cocktail-plus-helper.sh 的那段 RUN
 RUN bash -c '\
   PLUGIN_ID="cocktail-plus"; \
   APP_HOME=/home/node/app; \
@@ -70,9 +85,7 @@ RUN mkdir -p "config" || true && \
 RUN echo "*** 清理 ***" && \
     mv "./docker/docker-entrypoint.sh" "./" && \
     rm -rf "./docker" && \
-    echo "*** 使docker-entrypoint.sh可执行 ***" && \
     chmod +x "./docker-entrypoint.sh" && \
-    echo "*** 转换行尾为Unix格式 ***" && \
     dos2unix "./docker-entrypoint.sh" || true
 
 RUN sed -i 's/# Start the server/.\/launch.sh/g' docker-entrypoint.sh
@@ -83,6 +96,16 @@ RUN mkdir -p /tmp/sillytavern_backup && \
 RUN chmod -R 777 ${APP_HOME} && \
     chmod -R 777 /tmp/sillytavern_backup
 
+# ===== 启动脚本：用 Token 方式跑 cloudflared =====
+RUN printf '#!/bin/bash\n\
+if [ -z "$TUNNEL_TOKEN" ]; then\n\
+  echo "错误: 未设置 TUNNEL_TOKEN 环境变量"; exit 1;\n\
+fi\n\
+cloudflared tunnel --no-autoupdate run --token "$TUNNEL_TOKEN" &\n\
+exec ./docker-entrypoint.sh\n' > /home/node/app/start-with-cloudflared.sh && \
+    chmod +x /home/node/app/start-with-cloudflared.sh
+# =====================================================
+
 EXPOSE 8000
 
-CMD [ "./docker-entrypoint.sh" ] 
+CMD [ "./start-with-cloudflared.sh" ]
