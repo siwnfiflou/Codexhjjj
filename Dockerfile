@@ -4,7 +4,8 @@ ARG APP_HOME=/home/node/app
 
 RUN apk add --no-cache gcompat tini git python3 py3-pip bash dos2unix findutils tar curl
 
-RUN pip3 install --no-cache-dir huggingface_hub
+# 同时预装 HuggingFace 与 魔搭(ModelScope) 客户端
+RUN pip3 install --no-cache-dir huggingface_hub modelscope-hub
 
 # ===== 安装 cloudflared =====
 RUN set -eux; \
@@ -29,9 +30,20 @@ ENV NODE_ENV=production
 ENV USERNAME="admin"
 ENV PASSWORD="password"
 
-# ===== 新增：Tunnel Token（见下方两种填法说明）=====
+# ===== Cloudflare Tunnel Token =====
 ENV TUNNEL_TOKEN=""
-# ====================================================
+# ===================================
+
+# ===== 备份相关环境变量（可在部署平台覆盖）=====
+# HuggingFace：仅上传
+ENV HF_TOKEN=""
+ENV DATASET_ID=""
+# 魔搭(ModelScope)：上传 + 下载恢复
+ENV MS_TOKEN=""
+ENV MS_DATASET_ID=""
+# 同步间隔（秒），默认 3600
+ENV SYNC_INTERVAL="3600"
+# =============================================
 
 RUN git clone https://github.com/SillyTavern/SillyTavern.git .
 
