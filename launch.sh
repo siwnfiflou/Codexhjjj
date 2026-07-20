@@ -35,7 +35,6 @@ cat ${BASE}/config/config.yaml
 
 if [ ! -z "${HF_TOKEN}" ] && [ ! -z "${DATASET_ID}" ]; then
   echo "===== 启动前：先从魔搭同步恢复数据（前台阻塞，日志直接输出）====="
-  # RESTORE_ONLY=1 让 syd.sh 只做下载恢复然后退出，不进循环
   RESTORE_ONLY=1 ${BASE}/syd.sh
   echo "===== 恢复流程结束，启动后台循环备份 ====="
   nohup ${BASE}/syd.sh > ${BASE}/sync_data.log 2>&1 &
