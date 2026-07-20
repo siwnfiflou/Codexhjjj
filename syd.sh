@@ -426,4 +426,11 @@ syn() {
 }
 
 # 启动同步进程
+# 启动同步进程
+if [ "${RESTORE_ONLY:-0}" = "1" ]; then
+    log_info "RESTORE_ONLY 模式：恢复已完成，退出，不进入备份循环。"
+    exit 0
+fi
+
 syn
+
